@@ -52,10 +52,16 @@ def pred_at_edge(input_img):
             results = plugin.extract_output()
             if results is None:
                 raise ValueError("No results returned from inference.")
-            pred = int(np.argmax(results))
+            # Flatten model outputs and compute softmax to get 0-1 probabilities
+            logits = results.flatten()
+            # Numerical stability for softmax
+            max_logit = np.max(logits)
+            exp_shifted = np.exp(logits - max_logit)
+            probs = exp_shifted / (np.sum(exp_shifted) + 1e-12)
+            pred = int(np.argmax(probs))
             disease = SKIN_CLASSES.get(pred, "Unknown")
-            accuracy = float(results[0][pred])
-            print(f"Disease: {disease}, Accuracy: {accuracy}")
+            accuracy = float(probs[pred])
+            print(f"Disease: {disease}, Accuracy (softmax): {accuracy}")
             # Build a score function over original image resolution for occlusion
             def score_fn(img_bgr):
                 final = preprocessing(img_bgr, net_input_shape[2], net_input_shape[3])
@@ -83,8 +89,6 @@ def pred_at_edge(input_img):
     except Exception as e:
         # Fallback to KNN if OpenVINO model is incompatible or missing
         try:
-            # KNN prediction
-            label, conf = knn_predict_image(input_img)
             # Build KNN score function for occlusion heatmap
             img = cv2.imread(input_img, cv2.IMREAD_COLOR)
             def score_fn_knn(bgr):
@@ -92,7 +96,11 @@ def pred_at_edge(input_img):
                 return scores
             # choose target index by max score
             scores_full, classes = knn_score_vector_bgr(img)
-            target = int(np.argmax(scores_full))
+            # Apply softmax over scores to get 0-1 probabilities
+            max_s = float(np.max(scores_full))
+            exp_scores = np.exp(scores_full - max_s)
+            probs_knn = exp_scores / (np.sum(exp_scores) + 1e-12)
+            target = int(np.argmax(probs_knn))
             heatmap = occlusion_sensitivity(img, score_fn_knn, target, patch_size=32, stride=24)
             heatmap_path = None
             if heatmap is not None:
@@ -104,7 +112,10 @@ def pred_at_edge(input_img):
                 heatmap_path = heatmap_filename
             # Use clinical severity assessment
             level, sev_score, advice = calculate_clinical_severity(img)
-            return f"KNN: {label}", conf, heatmap_path, 'KNN', level, sev_score, advice
+            label = classes[target] if 0 <= target < len(classes) else 'Unknown'
+            accuracy = float(probs_knn[target])
+            print(f"Disease: KNN: {label}, Accuracy (softmax): {accuracy}")
+            return f"KNN: {label}", accuracy, heatmap_path, 'KNN', level, sev_score, advice
         except Exception as knn_e:
             print("Error during prediction:", str(e))
             print("KNN fallback failed:", str(knn_e))
