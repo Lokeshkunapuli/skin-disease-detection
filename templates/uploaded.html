@@ -1,0 +1,81 @@
+{% extends 'base.html' %}
+{% block title %}Upload • SkinDetect{% endblock %}
+{% block content %}
+<div class="container py-4">
+  <div class="row justify-content-center">
+    <div class="col-lg-8">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <form class="mb-4" action="{{ url_for('upload_file') }}" method="post" enctype="multipart/form-data">
+            <div class="dropzone mb-3">
+              <p class="mb-1">Drag & drop an image here</p>
+              <p class="text-muted small">or click to select</p>
+              <input class="form-control" type="file" name="file" accept="image/*" required>
+            </div>
+            <div class="preview text-center mb-3"></div>
+            <div class="text-end">
+              <button class="btn btn-primary" type="submit">Upload & Predict</button>
+            </div>
+          </form>
+          {% if error %}
+            <div class="alert alert-danger" role="alert">{{ error }}</div>
+          {% else %}
+            <div class="text-center mb-4">
+              {% if img_file %}
+                <img class="img-fluid rounded" style="max-height:320px" src="{{ url_for('static', filename='data/' ~ img_file) }}" alt="uploaded image">
+              {% endif %}
+            </div>
+            {% if heatmap_file %}
+            <div class="text-center mb-4">
+              <img class="img-fluid rounded" style="max-height:320px" src="{{ url_for('static', filename='data/' ~ heatmap_file) }}" alt="explanation heatmap">
+            </div>
+            <div class="card bg-body-tertiary border-0 mb-3">
+              <div class="card-body">
+                <h5 class="card-title mb-2">Explainable AI</h5>
+                <p class="card-text small text-muted mb-0">
+                  This heatmap highlights regions that most influenced the predicted class using occlusion sensitivity.
+                  Brighter areas indicate stronger impact on the model’s decision.
+                </p>
+              </div>
+            </div>
+            {% endif %}
+            <h3 class="fw-semibold">Disease Predicted</h3>
+            <p class="fs-5">
+              <span class="badge badge-soft">{{ predictions if predictions else '—' }}</span>
+              {% if backend %}
+                <span class="badge text-bg-secondary ms-2">{{ backend }}</span>
+              {% endif %}
+            </p>
+            <div class="row g-3">
+              <div class="col-md-4">
+                <div class="p-3 bg-body-tertiary rounded border"><span class="badge badge-acc">Accuracy</span> {{ '%.3f'|format(acc) if acc else '—' }}</div>
+              </div>
+              <div class="col-md-4">
+                <div class="p-3 bg-body-tertiary rounded border"><span class="badge badge-acc">Time (s)</span> {{ '%.3f'|format(time_diff) if time_diff else '—' }}</div>
+              </div>
+            </div>
+            <div class="row g-3 mt-2">
+              <div class="col-md-6">
+                <div class="p-3 bg-body-tertiary rounded border">
+                  <span class="badge text-bg-warning">Severity</span>
+                  {{ sev_level if sev_level else '—' }}
+                  <div class="small text-muted">Score: {{ '%.2f'|format(sev_score) if sev_score is not none else '—' }}</div>
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="p-3 bg-body-tertiary rounded border">
+                  <span class="badge text-bg-info">Advice</span>
+                  <div class="small">{{ sev_advice if sev_advice else '' }}</div>
+                </div>
+              </div>
+            </div>
+          {% endif %}
+          <div class="mt-4">
+            <a class="btn btn-secondary" href="{{ url_for('index') }}">Back to Home</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
